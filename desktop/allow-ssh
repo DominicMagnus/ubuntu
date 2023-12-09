@@ -6,3 +6,6 @@ sudo systemctl enable ssh
 
 # optional
 sudo ufw allow ssh
+
+# allow use sshpass
+sudo apt-get install sshpass
