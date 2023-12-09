@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# chmod +x script_name.sh
+
 # Variables for paths and servers
 source_username="source_username"
 destination_username="destination_username"
