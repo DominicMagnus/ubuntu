@@ -1,0 +1,17 @@
+#!/bin/bash
+
+# Variables for paths and servers
+source_server="username@source_server_ip"
+destination_server="username@destination_server_ip"
+source_directory="/path/to/source_directory"
+destination_directory="/path/to/destination_directory"
+
+# SCP command to copy files using SSH keys
+scp -i /path/to/private_key "${source_directory}" "${destination_server}:${destination_directory}"
+
+# Checking the exit code of scp
+if [ $? -eq 0 ]; then
+    echo "Files copied successfully"
+else
+    echo "Failed to copy files"
+fi
