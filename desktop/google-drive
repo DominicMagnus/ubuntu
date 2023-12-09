@@ -1,0 +1,8 @@
+# gdrive user catalog
+/run/user/1000/gvfs/google-drive:host=gmail.com,user=xxxxxxxxxxx/drive
+
+# file list
+gio list -d
+
+# make dir (mkdir laso works)
+gio mkdir
