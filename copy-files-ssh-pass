@@ -1,14 +1,16 @@
 #!/bin/bash
 
 # Variables for paths and servers
-source_server="username@source_server_ip"
-destination_server="username@destination_server_ip"
+source_username="source_username"
+destination_username="destination_username"
+source_server="source_server_ip"
+destination_server="destination_server_ip"
 source_directory="/path/to/source_directory"
 destination_directory="/path/to/destination_directory"
 password="your_password" # Replace 'your_password' with your actual password
 
 # SCP command to copy files using password authentication
-sshpass -p "${password}" scp "${source_directory}" "${destination_server}:${destination_directory}"
+sshpass -p "${password}" scp "${source_username}@${source_server}:${source_directory}" "${destination_username}@${destination_server}:${destination_directory}"
 
 # Checking the exit code of scp
 if [ $? -eq 0 ]; then
