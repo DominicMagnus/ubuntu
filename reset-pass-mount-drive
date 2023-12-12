@@ -1,0 +1,4 @@
+sudo fdisk -l
+# where XX your drive id
+sudo mount /dev/sdXX /media/Name_of_directory
+
