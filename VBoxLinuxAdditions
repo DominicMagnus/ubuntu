@@ -1,0 +1,6 @@
+# mount Guest additions to VM from vbox gui
+# run 
+sudo apt install bzip2
+mount /dev/cdrom /mnt
+sh /media/cdrom/VBoxLinuxAdditions.run
+reboot
