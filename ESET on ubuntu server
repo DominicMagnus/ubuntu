@@ -1,0 +1,8 @@
+
+# on windows
+scp C:\ESET\agent-linux-x86_64.sh user@192.168.1.2:/home/user/agent-linux-x86_64.sh
+
+# on linux
+chmod +x /home/user/agent-linux-x86_64.sh
+
+/home/user/agent-linux-x86_64.sh
