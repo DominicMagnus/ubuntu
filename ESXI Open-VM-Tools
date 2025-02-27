@@ -1,0 +1,5 @@
+sudo apt update
+sudo apt install open-vm-tools -y
+# for GUI
+sudo apt install open-vm-tools-desktop -y
+sudo reboot
