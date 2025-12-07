@@ -1,0 +1,17 @@
+# lynis audit system
+
+sudo apt install -y lynis
+
+lynis --version
+
+#run
+sudo lynis audit system
+
+#log
+sudo less /var/log/lynis.log
+
+#non human
+sudo cat /var/log/lynis-report.dat
+
+#Quickly pull up warnings and recommendations:
+sudo grep -E "warning|suggestion" /var/log/lynis-report.dat
