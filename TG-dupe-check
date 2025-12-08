@@ -1,0 +1,332 @@
+# MANUAL: Monitor identical / copy-paste posts in Telegram channels on Ubuntu using Python (Telethon + RapidFuzz) + user cron
+# PURPOSE:
+# - Collect messages from a list of Telegram channels
+# - Detect identical and near-identical posts within the last N hours
+# - Run as a regular user (no sudo in Python script)
+# - Use venv for clean dependencies
+# - Keep daily logs for cron visibility
+# =============================================================================
+# 1) INSTALL REQUIRED PACKAGES
+# =============================================================================
+sudo apt update
+sudo apt install -y python3 python3-pip python3-venv
+
+# Optional verification
+python3 --version
+pip3 --version
+
+# =============================================================================
+# 2) CREATE PROJECT DIRECTORY
+# =============================================================================
+mkdir -p ~/tg-dupe
+cd ~/tg-dupe
+
+# =============================================================================
+# 3) CREATE VENV AND INSTALL DEPENDENCIES
+# =============================================================================
+python3 -m venv .venv
+source .venv/bin/activate
+
+pip install --upgrade pip
+pip install telethon rapidfuzz
+
+# =============================================================================
+# 4) TELEGRAM ACCOUNT PREREQUISITES
+# =============================================================================
+# You need Telegram API credentials:
+# - Go to: my.telegram.org -> API development tools
+# - Create an app
+# - Get api_id and api_hash
+#
+# NOTE:
+# - The first login to Telethon is interactive (phone + code).
+# - Do it manually once before cron usage.
+
+# =============================================================================
+# 5) CREATE THE MAIN SCRIPT
+# =============================================================================
+nano ~/tg-dupe/tg_dupe_checker.py
+
+# Paste this script and replace placeholders:
+# ----
+# from telethon import TelegramClient
+# from telethon.tl.functions.messages import GetHistoryRequest
+# from datetime import datetime, timedelta, timezone
+# from collections import defaultdict
+# import hashlib
+# from rapidfuzz import fuzz
+#
+# # ==========================
+# # 1) YOUR API DATA
+# # ==========================
+# api_id = 123456
+# api_hash = "YOUR_HASH"
+# session_name = "tg_dupe_checker"
+#
+# # ==========================
+# # 2) CHANNELS LIST
+# # ==========================
+# channels = [
+#     "imaginary_channel_one",
+#     "imaginary_channel_two",
+#     "imaginary_channel_three",
+# ]
+#
+# # ==========================
+# # 3) SETTINGS
+# # ==========================
+# LOOKBACK_HOURS = 1
+# HISTORY_LIMIT = 200
+# FUZZY_THRESHOLD = 94
+# MIN_TEXT_LEN = 40
+#
+# client = TelegramClient(session_name, api_id, api_hash)
+#
+# def normalize_text(text: str) -> str:
+#     text = " ".join(text.split())
+#     return text.lower().strip()
+#
+# async def fetch_recent_messages(ch_username: str, since_dt: datetime):
+#     entity = await client.get_entity(ch_username)
+#
+#     history = await client(GetHistoryRequest(
+#         peer=entity,
+#         limit=HISTORY_LIMIT,
+#         offset_date=None,
+#         offset_id=0,
+#         max_id=0,
+#         min_id=0,
+#         add_offset=0,
+#         hash=0
+#     ))
+#
+#     results = []
+#     for msg in history.messages:
+#         if not getattr(msg, "message", None):
+#             continue
+#         if msg.date < since_dt:
+#             continue
+#
+#         raw = msg.message
+#         norm = normalize_text(raw)
+#
+#         if len(norm) < MIN_TEXT_LEN:
+#             continue
+#
+#         results.append({
+#             "channel": ch_username,
+#             "id": msg.id,
+#             "date": msg.date,
+#             "raw": raw,
+#             "norm": norm,
+#         })
+#
+#     return results
+#
+# async def main():
+#     now = datetime.now(timezone.utc)
+#     since = now - timedelta(hours=LOOKBACK_HOURS)
+#
+#     all_msgs = []
+#     for ch in channels:
+#         try:
+#             msgs = await fetch_recent_messages(ch, since)
+#             all_msgs.extend(msgs)
+#         except Exception as e:
+#             print(f"[WARN] Failed to read @{ch}: {e}")
+#
+#     if not all_msgs:
+#         print("No messages found for the selected window.")
+#         return
+#
+#     # --------------------------
+#     # EXACT DUPLICATES
+#     # --------------------------
+#     exact_map = defaultdict(list)
+#     for m in all_msgs:
+#         h = hashlib.sha256(m["norm"].encode("utf-8")).hexdigest()
+#         exact_map[h].append(m)
+#
+#     exact_groups = [items for items in exact_map.values() if len(items) >= 2]
+#
+#     print("\n" + "=" * 90)
+#     print("EXACT DUPLICATES")
+#     print("=" * 90)
+#
+#     if not exact_groups:
+#         print("No exact duplicates found.")
+#     else:
+#         for group in sorted(exact_groups, key=lambda g: len(g), reverse=True):
+#             group_sorted = sorted(group, key=lambda x: x["date"])
+#             print("\n" + "-" * 90)
+#             print(f"Same text in {len(group_sorted)} channels:")
+#             for it in group_sorted:
+#                 print(f"[{it['date']}] @{it['channel']} (msg id {it['id']})")
+#             print("Text:")
+#             print(group_sorted[0]["raw"])
+#
+#     # --------------------------
+#     # FUZZY DUPLICATES
+#     # --------------------------
+#     unique_texts = {}
+#     for m in all_msgs:
+#         unique_texts.setdefault(m["norm"], []).append(m)
+#
+#     norms = list(unique_texts.keys())
+#     used = set()
+#     fuzzy_groups = []
+#
+#     for i in range(len(norms)):
+#         if norms[i] in used:
+#             continue
+#
+#         base = norms[i]
+#         group = [base]
+#
+#         for j in range(i + 1, len(norms)):
+#             cand = norms[j]
+#             if cand in used:
+#                 continue
+#
+#             score = fuzz.ratio(base, cand)
+#             if score >= FUZZY_THRESHOLD:
+#                 group.append(cand)
+#
+#         if len(group) >= 2:
+#             for t in group:
+#                 used.add(t)
+#             fuzzy_groups.append(group)
+#
+#     print("\n" + "=" * 90)
+#     print(f"FUZZY DUPLICATES (>= {FUZZY_THRESHOLD})")
+#     print("=" * 90)
+#
+#     if not fuzzy_groups:
+#         print("No fuzzy duplicates found.")
+#     else:
+#         for group_norms in sorted(fuzzy_groups, key=len, reverse=True):
+#             expanded = []
+#             for t in group_norms:
+#                 expanded.extend(unique_texts[t])
+#
+#             expanded_sorted = sorted(expanded, key=lambda x: x["date"])
+#
+#             print("\n" + "-" * 90)
+#             print(f"Similar text across ~{len(set([m['channel'] for m in expanded_sorted]))} channels:")
+#             for it in expanded_sorted:
+#                 print(f"[{it['date']}] @{it['channel']} (msg id {it['id']})")
+#             print("Likely base text:")
+#             print(expanded_sorted[0]["raw"])
+#
+# if __name__ == "__main__":
+#     with client:
+#         client.loop.run_until_complete(main())
+# ----
+
+# =============================================================================
+# 6) FIRST MANUAL RUN (IMPORTANT)
+# =============================================================================
+cd ~/tg-dupe
+source .venv/bin/activate
+python tg_dupe_checker.py
+
+# You will be asked for:
+# - phone number
+# - Telegram login code
+#
+# After this, a local session file will be created in your home directory,
+# so cron can run without interactive input.
+
+# =============================================================================
+# 7) CREATE WRAPPER SCRIPT FOR CRON
+# =============================================================================
+nano ~/tg-dupe/run.sh
+
+# Paste:
+# ----
+# #!/usr/bin/env bash
+# set -euo pipefail
+#
+# APP_DIR="$HOME/tg-dupe"
+# VENV="$APP_DIR/.venv"
+# PY="$VENV/bin/python"
+# SCRIPT="$APP_DIR/tg_dupe_checker.py"
+# LOG_DIR="$APP_DIR/logs"
+#
+# mkdir -p "$LOG_DIR"
+# LOG_FILE="$LOG_DIR/run_$(date +%F).log"
+#
+# {
+#   echo "================================================================="
+#   echo "Run at: $(date -Is)"
+#   echo "Host: $(hostname)"
+#   echo "-----------------------------------------------------------------"
+#   "$PY" "$SCRIPT"
+#   echo
+# } >> "$LOG_FILE" 2>&1
+# ----
+
+chmod +x ~/tg-dupe/run.sh
+
+# =============================================================================
+# 8) MANUAL TEST OF WRAPPER
+# =============================================================================
+~/tg-dupe/run.sh
+ls -lah ~/tg-dupe/logs
+tail -n 200 ~/tg-dupe/logs/run_$(date +%F).log
+
+# =============================================================================
+# 9) ADD USER CRON (NO ROOT)
+# =============================================================================
+crontab -e
+
+# Examples:
+# Every 15 minutes:
+# */15 * * * * /home/YOUR_LINUX_USER/tg-dupe/run.sh
+#
+# Every hour on minute 5:
+# 5 * * * * /home/YOUR_LINUX_USER/tg-dupe/run.sh
+#
+# Twice a day:
+# 0 9,18 * * * /home/YOUR_LINUX_USER/tg-dupe/run.sh
+
+crontab -l
+
+# =============================================================================
+# 10) QUICK TROUBLESHOOTING
+# =============================================================================
+# Confirm you are running as your user:
+whoami
+
+# Check venv Python exists:
+ls -l ~/tg-dupe/.venv/bin/python
+
+# Check script path:
+ls -l ~/tg-dupe/tg_dupe_checker.py
+
+# Check wrapper:
+ls -l ~/tg-dupe/run.sh
+
+# Read latest logs:
+tail -n 200 ~/tg-dupe/logs/run_$(date +%F).log
+
+# If you see authentication errors in cron:
+# - Re-run manual login once:
+#   cd ~/tg-dupe
+#   source .venv/bin/activate
+#   python tg_dupe_checker.py
+
+# If a channel is private or unavailable for your account,
+# you will see WARN lines - это нормально.
+
+# =============================================================================
+# 11) OPTIONAL TUNING
+# =============================================================================
+# Less noise:
+# - Increase MIN_TEXT_LEN to 60+
+# - Increase FUZZY_THRESHOLD to 96
+#
+# More coverage:
+# - Increase HISTORY_LIMIT to 500
+# - Increase LOOKBACK_HOURS to 2
+
