@@ -1,0 +1,33 @@
+# Install required packages
+sudo apt update
+sudo apt install -y msmtp msmtp-mta bsd-mailx ca-certificates
+# Create ~/.msmtprc with Gmail SMTP (use your 16-char App Password)
+cat > ~/.msmtprc <<'EOF'
+# msmtp config for Gmail SMTP
+defaults
+auth           on
+tls            on
+tls_starttls   on
+tls_trust_file /etc/ssl/certs/ca-certificates.crt
+logfile        ~/.msmtp.log
+account gmail
+host smtp.gmail.com
+port 587
+from YOUR_GMAIL_ADDRESS@gmail.com
+user YOUR_GMAIL_ADDRESS@gmail.com
+password YOUR_16_CHAR_APP_PASSWORD
+account default : gmail
+EOF
+# Secure permissions for the config
+chmod 600 ~/.msmtprc
+# Test sending via mailx
+echo "test from $(hostname)" | mail -s "msmtp test" YOUR_GMAIL_ADDRESS@gmail.com
+# Alternative direct msmtp test
+echo "test" | msmtp -a gmail YOUR_GMAIL_ADDRESS@gmail.com
+# Verify sendmail points to msmtp wrapper
+which sendmail
+ls -l "$(which sendmail)"
+# Check msmtp logs if something fails
+tail -n 200 ~/.msmtp.log
+# Send Lynis warnings/suggestions to Gmail
+sudo grep -E "warning|suggestion" /var/log/lynis-report.dat | mail -s "Lynis warnings on $(hostname) $(date -Iseconds)" YOUR_GMAIL_ADDRESS@gmail.com
